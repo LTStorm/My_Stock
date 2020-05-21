@@ -1,0 +1,305 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:MyStock/flutter_candlesticks.dart';
+import 'package:MyStock/main.dart';
+import 'package:MyStock/resource/database/database.dart';
+
+class NullInfo extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        home: Scaffold(
+      body: Container(
+        child: Text(
+          "This data is not available",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 50, color: Colors.black),
+        ),
+        alignment: Alignment.center,
+      ),
+    ));
+  }
+}
+
+class InforDetailsScreen extends StatefulWidget {
+  final code;
+  bool isFavorite;
+  List sampleData = [];
+  InforDetailsScreen(this.code, {this.isFavorite = false});
+  @override
+  _InforDetailsScreenState createState() => _InforDetailsScreenState();
+}
+
+class _InforDetailsScreenState extends State<InforDetailsScreen> {
+  String _graphMode = "1 month";
+  Future<void> fetchData() async {
+    switch (_graphMode) {
+      case "1 month":
+        widget.sampleData =
+            await DbProvider.db.getChartInfo_1m(widget.code["symbol"]);
+        break;
+      case "1 day":
+        widget.sampleData =
+            await DbProvider.db.getChartInfo_1d(widget.code["symbol"]);
+        break;
+    }
+    return 0;
+  }
+
+  Future<int> checkFavorite() async {
+    var check =
+        await DbProvider.db.checkIfSymbolIsFavorite(widget.code["symbol"],logedInAccount.username);
+    if (check)
+      widget.isFavorite = true;
+    else
+      widget.isFavorite = false;
+    return 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          textTheme: isDarkTheme ? darkTheme.textTheme : lightTheme.textTheme,
+          centerTitle: true,
+          actions: isLoggedIn
+              ? <Widget>[
+                  FlatButton(
+                    child: futureFavoriteButton(),
+                    onPressed: toggleFavorite,
+                  )
+                ]
+              : <Widget>[],
+          title: Title(
+            color: isDarkTheme ? Color(0xff190e18) : Color(0xffced9d2),
+            child: Text(
+              "Details",
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 20,
+              ),
+            ),
+          ),
+        ),
+        body: ListView(
+          scrollDirection: Axis.vertical,
+          children: <Widget>[
+            createInfoTab(),
+            createGraphContainer(),
+          ],
+        ));
+  }
+
+  Widget createInfoTab() => Container(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(" ${widget.code["companyName"]} ",
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w200,
+                )),
+            Row(
+              children: <Widget>[
+                Text("${widget.code["symbol"]}",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w600,
+                    )),
+                Spacer(flex: 3),
+                Text("${widget.code["primaryExchange"]}",
+                    style: TextStyle(
+                      fontSize: 21,
+                    )),
+              ],
+              crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            widget.code["latestSource"] == "Close"
+                ? Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.red,
+                        size: 14,
+                      ),
+                      Text(
+                        'Close Market',
+                        style: TextStyle(color: Colors.red, fontSize: 14),
+                      )
+                    ],
+                  )
+                : Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.check_circle,
+                        color: Color.fromARGB(100, 0, 179, 0),
+                        size: 14,
+                      ),
+                      Text(
+                        'Open Market',
+                        style: TextStyle(
+                            color: Color.fromARGB(100, 0, 179, 0),
+                            fontSize: 14),
+                      )
+                    ],
+                  ),
+            Divider(color: Colors.greenAccent),
+            Text(
+              '${widget.code['latestPrice']} USD',
+              style: TextStyle(
+                  color: Color.fromARGB(100, 0, 179, 0), fontSize: 34),
+            ),
+            Container(
+              child: Row(
+                children: <Widget>[
+                  Column(
+                    children: <Widget>[
+                      Text(widget.code['open'] == null
+                          ? ''
+                          : 'Open: ${widget.code['open']}'),
+                      Text(widget.code['high'] == null
+                          ? ''
+                          : 'High: ${widget.code['high']}'),
+                      Text(widget.code['low'] == null
+                          ? ''
+                          : 'Low: ${widget.code['low']}'),
+                    ],
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  Column(
+                    children: <Widget>[
+                      Text(widget.code['close'] == null
+                          ? ''
+                          : 'Close: ${widget.code['close']}'),
+                      Text(widget.code['marketCap'] == null
+                          ? ''
+                          : 'Mkt Cap: ${widget.code['marketCap']}'),
+                      Text(widget.code['peRatio'] == null
+                          ? ""
+                          : 'P/E ratio: ${widget.code['peRatio']}'),
+                    ],
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                ],
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              ),
+            )
+          ],
+        ),
+        margin: EdgeInsets.all(4),
+        padding: EdgeInsets.fromLTRB(13, 5, 5, 13),
+      );
+  Widget createGraphContainer() => Container(
+        child: Container(
+          padding: EdgeInsets.fromLTRB(13, 13, 10, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Text(
+                    'Graph',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w200,
+                    ),
+                  ),
+                  Spacer(),
+                  DropdownButton(
+                    hint: Text(_graphMode),
+                    items: ["1 day", "1 month"].map((f) {
+                      return DropdownMenuItem(
+                        child: Text(f),
+                        value: f,
+                      );
+                    }).toList(),
+                    onChanged: (String value) {
+                      setState(() {
+                        _graphMode = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              Container(
+                child: futureGraphWidget(),
+                height: 340,
+                width: MediaQuery.of(context).size.width,
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget futureGraphWidget() {
+    return new FutureBuilder(
+      future: fetchData(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          if (widget.sampleData == null) {
+            return new Container(
+              child: new Text(
+                "This data is not available",
+                style: TextStyle(fontSize: 20),
+              ),
+              alignment: Alignment.center,
+            );
+          } else
+            return OHLCVGraph(
+              data: widget.sampleData,
+              enableGridLines: true,
+              volumeProp: 0.2,
+              lineWidth: 0.5,
+              decreaseColor: Colors.redAccent,
+              increaseColor: Colors.purple,
+              labelPrefix: "",
+            );
+        } else if (snapshot.hasError) {
+          return new Container(
+            child: new Text(
+              "This data is not available",
+              style: TextStyle(fontSize: 20),
+            ),
+            alignment: Alignment.center,
+          );
+        } else
+          return new CircularProgressIndicator();
+      },
+    );
+  }
+
+  Widget futureFavoriteButton() {
+    return new FutureBuilder(
+      future: checkFavorite(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          if (widget.isFavorite)
+            return Icon(Icons.remove);
+          else
+            return Icon(Icons.add);
+        } else {
+          return Icon(Icons.add);
+        }
+      },
+    );
+  }
+
+  void toggleFavorite() async {
+    if (widget.isFavorite) {
+      await DbProvider.db.deleteFromFavoriteList(widget.code['symbol'],logedInAccount.username);
+      setState(() {
+        widget.isFavorite = false;
+        print("click ${widget.isFavorite}");
+      });
+    } else {
+      await DbProvider.db.addToFavoriteList(widget.code['symbol'],logedInAccount.username);
+      setState(() {
+        widget.isFavorite = true;
+        print("click ${widget.isFavorite}");
+      });
+    }
+  }
+}
